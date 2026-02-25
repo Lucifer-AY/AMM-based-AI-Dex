@@ -1,0 +1,52 @@
+# Core LangChain and LangGraph
+langgraph>=0.2.50
+langgraph-cli>=0.4.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-openai>=0.2.0
+langsmith>=0.1.0
+
+# Groq API (Fast and Free!)
+openai>=1.0.0
+groq>=0.4.0
+
+# MCP (Model Context Protocol) Support
+langchain-core>=0.3.0
+toolbox-langchain>=0.1.0
+
+# Data Analysis
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Technical Analysis
+ta>=0.11.0
+
+# Crypto Data (CoinGecko API - 100% Free)
+requests>=2.31.0
+pycoingecko>=3.1.0
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.17.0
+
+# Web Interface
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# CLI Interface
+rich>=13.7.0
+
+# Environment and Config
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Async support
+aiohttp>=3.9.0
+
+# Web Search (Tavily for market sentiment and news)
+tavily>=0.3.0
+
+# Utilities
+python-dateutil>=2.8.2
+pytz>=2023.3
