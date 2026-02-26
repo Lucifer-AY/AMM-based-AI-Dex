@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     enable_mcp_tools: bool = Field(default=True, alias="ENABLE_MCP_TOOLS")
     mcp_tool_choice: str = Field(default="auto", alias="MCP_TOOL_CHOICE")  # auto, required, none
     mcp_toolbox_url: str = Field(default="", alias="MCP_TOOLBOX_URL")  # Optional ToolboxClient URL
+
+    # Local Query Logging
+    enable_query_logging: bool = Field(default=True, alias="ENABLE_QUERY_LOGGING")
+    query_log_db_path: str = Field(default="logs/query_logs.db", alias="QUERY_LOG_DB_PATH")
+
+    # Prediction Feedback Loop (predict -> store -> evaluate -> improve)
+    enable_prediction_feedback_loop: bool = Field(default=True, alias="ENABLE_PREDICTION_FEEDBACK_LOOP")
+    prediction_feedback_store_path: str = Field(default="logs/prediction_feedback.json", alias="PREDICTION_FEEDBACK_STORE_PATH")
+    prediction_feedback_hold_band_pct: float = Field(default=1.5, alias="PREDICTION_FEEDBACK_HOLD_BAND_PCT")
+    rl_model_path: str = Field(default="models/rl_q_table.json", alias="RL_MODEL_PATH")
     
     class Config:
         env_file = ".env"

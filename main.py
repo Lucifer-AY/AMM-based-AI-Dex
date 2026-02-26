@@ -8,6 +8,7 @@ This provides multiple interfaces to interact with the trading agent:
 
 import asyncio
 import sys
+import time
 from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -16,6 +17,7 @@ from rich.prompt import Prompt
 
 from trading_agent import run_trading_agent_sync, run_trading_agent
 from config import settings
+from query_logger import log_query_event
 
 
 # Initialize Rich console for beautiful output
@@ -80,9 +82,19 @@ def interactive_mode():
                 continue
             
             # Show processing message
+            start_time = time.perf_counter()
             with console.status("[bold green]🔍 Analyzing market data...", spinner="dots"):
                 # Run agent
                 result = run_trading_agent_sync(user_input)
+            latency = round(time.perf_counter() - start_time, 3)
+
+            log_query_event(
+                mode="interactive",
+                query_text=user_input,
+                success=True,
+                latency_seconds=latency,
+                response_text=result,
+            )
             
             # Display result
             display_result(result)
@@ -91,6 +103,12 @@ def interactive_mode():
             console.print("\n\n👋 Goodbye!", style="bold blue")
             break
         except Exception as e:
+            log_query_event(
+                mode="interactive",
+                query_text=user_input if 'user_input' in locals() else "",
+                success=False,
+                error_message=str(e),
+            )
             display_error(str(e))
 
 
@@ -99,12 +117,28 @@ def single_query_mode(query: str):
     console.print(f"\n🔍 Analyzing: {query}\n", style="bold cyan")
     
     try:
+        start_time = time.perf_counter()
         with console.status("[bold green]Processing...", spinner="dots"):
             result = run_trading_agent_sync(query)
+        latency = round(time.perf_counter() - start_time, 3)
+
+        log_query_event(
+            mode="single_query",
+            query_text=query,
+            success=True,
+            latency_seconds=latency,
+            response_text=result,
+        )
         
         display_result(result)
         
     except Exception as e:
+        log_query_event(
+            mode="single_query",
+            query_text=query,
+            success=False,
+            error_message=str(e),
+        )
         display_error(str(e))
 
 
@@ -170,11 +204,35 @@ def run_api_server():
                     query += f" with ${request.amount}"
                 
                 # Run agent
+                start_time = time.perf_counter()
                 result = await run_trading_agent(query)
+                latency = round(time.perf_counter() - start_time, 3)
+
+                log_query_event(
+                    mode="api",
+                    query_text=query,
+                    symbol=request.symbol,
+                    amount=request.amount,
+                    risk_tolerance=request.risk_tolerance,
+                    investment_horizon=request.investment_horizon,
+                    success=True,
+                    latency_seconds=latency,
+                    response_text=result,
+                )
                 
                 return QueryResponse(success=True, recommendation=result)
                 
             except Exception as e:
+                log_query_event(
+                    mode="api",
+                    query_text=request.query,
+                    symbol=request.symbol,
+                    amount=request.amount,
+                    risk_tolerance=request.risk_tolerance,
+                    investment_horizon=request.investment_horizon,
+                    success=False,
+                    error_message=str(e),
+                )
                 raise HTTPException(status_code=500, detail=str(e))
         
         console.print("\n🚀 Starting API Server...\n", style="bold green")

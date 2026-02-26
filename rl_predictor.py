@@ -7,6 +7,9 @@ No extensive training needed - uses pattern recognition and adaptive learning.
 import numpy as np
 from typing import Dict, List, Tuple
 import pandas as pd
+import json
+import os
+from config import settings
 
 
 class RLPredictor:
@@ -127,6 +130,7 @@ class RLPredictor:
             'confidence_score': round(confidence, 2),
             'q_values': {action: round(q, 3) for action, q in zip(self.actions, q_values)},
             'state': state_key,
+            'action_idx': action_idx,
             'action_strength': self.action_values[action_idx],
             'method': 'q_learning'
         }
@@ -178,7 +182,11 @@ class RLPredictor:
             'current_price': current_price,
             'signal': signal_data['signal'],
             'confidence': signal_data['confidence'],
+            'confidence_score': signal_data.get('confidence_score', 0.5),
             'q_values': signal_data['q_values'],
+            'state': signal_data.get('state'),
+            'action_idx': signal_data.get('action_idx'),
+            'action_strength': signal_data.get('action_strength', 0),
             'expected_return': ((predictions[-1] - current_price) / current_price) * 100,
             'method': 'rl_q_learning'
         }
@@ -217,12 +225,13 @@ class RLPredictor:
         
         # Technical indicators (if available)
         if technical_analysis:
-            features['rsi'] = technical_analysis.get('rsi', {}).get('current_rsi', 50)
+            rsi_data = technical_analysis.get('rsi', {})
+            features['rsi'] = rsi_data.get('current_rsi', rsi_data.get('rsi', 50))
             
             # EMA trend
             ema = technical_analysis.get('ema', {})
-            if ema and 'ema_values' in ema:
-                ema_vals = ema['ema_values']
+            if ema:
+                ema_vals = ema.get('ema_values', ema.get('emas', {}))
                 if 'ema_9' in ema_vals and 'ema_21' in ema_vals:
                     # Bullish if short EMA > long EMA
                     features['ema_trend'] = 1 if ema_vals['ema_9'] > ema_vals['ema_21'] else -1
@@ -233,6 +242,71 @@ class RLPredictor:
                 features['bb_position'] = bb['position']
         
         return features
+
+    def save_model(self, file_path: str = "models/rl_q_table.json") -> str:
+        """
+        Save Q-table and hyperparameters to disk.
+
+        Args:
+            file_path: Target JSON file path
+
+        Returns:
+            Saved file path
+        """
+        directory = os.path.dirname(file_path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
+        payload = {
+            "metadata": {
+                "learning_rate": self.learning_rate,
+                "discount_factor": self.discount_factor,
+                "epsilon": self.epsilon,
+                "actions": self.actions,
+                "action_values": self.action_values,
+            },
+            "q_table": {
+                state: [float(value) for value in values.tolist()]
+                for state, values in self.q_table.items()
+            },
+        }
+
+        with open(file_path, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+
+        return file_path
+
+    def load_model(self, file_path: str = "models/rl_q_table.json") -> bool:
+        """
+        Load Q-table and hyperparameters from disk.
+
+        Args:
+            file_path: Source JSON file path
+
+        Returns:
+            True if model was loaded, False if file does not exist
+        """
+        if not os.path.exists(file_path):
+            return False
+
+        with open(file_path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        metadata = payload.get("metadata", {})
+        self.learning_rate = float(metadata.get("learning_rate", self.learning_rate))
+        self.discount_factor = float(metadata.get("discount_factor", self.discount_factor))
+        self.epsilon = float(metadata.get("epsilon", self.epsilon))
+
+        self.actions = metadata.get("actions", self.actions)
+        self.action_values = metadata.get("action_values", self.action_values)
+
+        raw_q_table = payload.get("q_table", {})
+        self.q_table = {
+            state: np.array(values, dtype=float)
+            for state, values in raw_q_table.items()
+        }
+
+        return True
     
     def update_from_outcome(self, state_key: str, action_idx: int, 
                            reward: float, next_state_key: str):
@@ -310,4 +384,7 @@ def get_rl_predictor() -> RLPredictor:
             discount_factor=0.95,
             epsilon=0.1  # 10% exploration
         )
+        model_loaded = _rl_predictor.load_model(settings.rl_model_path)
+        if model_loaded:
+            print(f"✅ Loaded RL Q-table from {settings.rl_model_path}")
     return _rl_predictor

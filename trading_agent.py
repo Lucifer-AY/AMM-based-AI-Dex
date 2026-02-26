@@ -22,6 +22,7 @@ from rl_predictor import get_rl_predictor, format_rl_predictions
 from web_search import get_web_search
 from config import settings
 from mcp_tools import get_mcp_toolbox
+from prediction_feedback import store_prediction, process_due_predictions
 
 
 # ===== STATE DEFINITION =====
@@ -519,10 +520,35 @@ def predict_prices(state: TradingAgentState) -> TradingAgentState:
                 'predictions': rl_result['predictions'],
                 'return': rl_result['expected_return'],
                 'q_values': rl_result.get('q_values', {}),
-                'confidence': rl_result.get('confidence', 'medium')
+                'confidence': rl_result.get('confidence', 'medium'),
+                'state': rl_result.get('state'),
+                'action_idx': rl_result.get('action_idx'),
+                'action_strength': rl_result.get('action_strength')
             },
             'combined_score': combined_score
         }
+
+        # Store prediction for future real-world feedback evaluation.
+        try:
+            user_query = ""
+            if state.get('messages'):
+                last_msg = state['messages'][-1]
+                user_query = getattr(last_msg, 'content', '') or ''
+
+            store_prediction(
+                symbol=state['crypto_symbol'],
+                entry_price=current_price,
+                horizon_days=state['investment_horizon'],
+                final_signal=final_signal,
+                confidence=confidence,
+                predicted_price=combined_predictions[-1],
+                query_text=user_query,
+                rl_state=rl_result.get('state'),
+                rl_action_idx=rl_result.get('action_idx'),
+                rl_action_strength=rl_result.get('action_strength'),
+            )
+        except Exception as feedback_error:
+            print(f"⚠️  Prediction feedback storage skipped: {feedback_error}")
         
         return {
             **state,
@@ -844,6 +870,14 @@ async def run_trading_agent(user_message: str) -> str:
     """
     # Create agent
     agent = create_trading_agent()
+
+    # Evaluate due predictions and learn from real outcomes.
+    try:
+        feedback_result = process_due_predictions(max_items=20)
+        if feedback_result.get('processed', 0) > 0:
+            print(f"♻️  Feedback loop processed {feedback_result['processed']} predictions (updated {feedback_result.get('updated', 0)} RL states)")
+    except Exception as feedback_error:
+        print(f"⚠️  Feedback loop skipped: {feedback_error}")
     
     # Initialize state
     initial_state = {
@@ -890,6 +924,14 @@ def run_trading_agent_sync(user_message: str) -> str:
     """
     # Create agent
     agent = create_trading_agent()
+
+    # Evaluate due predictions and learn from real outcomes.
+    try:
+        feedback_result = process_due_predictions(max_items=20)
+        if feedback_result.get('processed', 0) > 0:
+            print(f"♻️  Feedback loop processed {feedback_result['processed']} predictions (updated {feedback_result.get('updated', 0)} RL states)")
+    except Exception as feedback_error:
+        print(f"⚠️  Feedback loop skipped: {feedback_error}")
     
     # Initialize state
     initial_state = {
